@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>録音テスト</title>
+</head>
+<body>
+    <h1>録音テスト</h1>
+    <button id="startRecording">録音開始</button>
+    <button id="stopRecording" disabled>録音停止</button>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let uploadInterval;
+
+        document.getElementById('startRecording').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.start();
+                document.getElementById('startRecording').disabled = true;
+                document.getElementById('stopRecording').disabled = false;
+
+                // 1分ごとにサーバに送信
+                uploadInterval = setInterval(() => {
+                    if (recordedChunks.length > 0) {
+                        uploadRecording();
+                    }
+                }, 60000); // 1分 = 60000ミリ秒
+            } catch (err) {
+                console.error('録音エラー:', err);
+                alert('マイクのアクセスが許可されていない可能性があります。');
+            }
+        });
+
+        document.getElementById('stopRecording').addEventListener('click', () => {
+            mediaRecorder.stop();
+            clearInterval(uploadInterval); // 定期送信を停止
+            document.getElementById('startRecording').disabled = false;
+            document.getElementById('stopRecording').disabled = true;
+
+            // 残りの録音データを送信
+            if (recordedChunks.length > 0) {
+                uploadRecording();
+            }
+        });
+
+        function uploadRecording() {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('file', blob, `recording_${Date.now()}.webm`);
+
+            fetch('http://127.0.0.1:5000/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    console.log('ファイルをアップロードしました');
+                } else {
+                    console.error('アップロード失敗:', response.statusText);
+                }
+            }).catch(err => {
+                console.error('アップロードエラー:', err);
+            });
+
+            // データをクリア
+            recordedChunks = [];
+        }
+    </script>
+</body>
+</html>
