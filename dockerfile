@@ -25,3 +25,7 @@ EXPOSE 5000
 
 # Command to run your Flask application
 CMD ["flask", "run", "--host=0.0.0.0"]
+
+# Resource constraints
+LABEL io.containers.resource.cpu.limit="1.0" \
+      io.containers.resource.memory.limit="512m"
